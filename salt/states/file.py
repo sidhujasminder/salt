@@ -1735,6 +1735,13 @@ def managed(name,
             the ``contents`` options, setting the ``mode`` to ``keep`` is also
             incompatible with the ``contents`` options.
 
+        .. note:: keep does not work with salt-ssh.
+
+            As a consequence of how the files are transfered to the minion, and
+            the inability to connect back to the master with salt-ssh, salt is
+            unable to stat the file as it exists on the fileserver and thus
+            cannot mirror the mode on the salt-ssh minion
+
     template
         If this setting is applied, the named templating engine will be used to
         render the downloaded file. The following templates are supported:
@@ -4185,10 +4192,11 @@ def blockreplace(
     if changes:
         ret['pchanges'] = {'diff': changes}
         if __opts__['test']:
+            ret['changes']['diff'] = ret['pchanges']['diff']
             ret['result'] = None
             ret['comment'] = 'Changes would be made'
         else:
-            ret['changes'] = {'diff': changes}
+            ret['changes']['diff'] = ret['pchanges']['diff']
             ret['result'] = True
             ret['comment'] = 'Changes were made'
     else:
@@ -5499,7 +5507,6 @@ def serialize(name,
               mode=None,
               backup='',
               makedirs=False,
-              show_diff=None,
               show_changes=True,
               create=True,
               merge_if_exists=False,
@@ -5571,12 +5578,6 @@ def serialize(name,
         Create parent directories for destination file.
 
         .. versionadded:: 2014.1.3
-
-    show_diff
-        DEPRECATED: Please use show_changes.
-
-        If set to ``False``, the diff will not be shown in the return data if
-        changes are made.
 
     show_changes
         Output a unified diff of the old file and the new file. If ``False``
@@ -5715,14 +5716,6 @@ def serialize(name,
 
     # Make sure that any leading zeros stripped by YAML loader are added back
     mode = salt.utils.normalize_mode(mode)
-
-    if show_diff is not None:
-        show_changes = show_diff
-        msg = (
-            'The \'show_diff\' argument to the file.serialized state has been '
-            'deprecated, please use \'show_changes\' instead.'
-        )
-        salt.utils.warn_until('Oxygen', msg)
 
     if __opts__['test']:
         ret['changes'] = __salt__['file.check_managed_changes'](

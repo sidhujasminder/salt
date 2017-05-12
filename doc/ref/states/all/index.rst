@@ -27,6 +27,7 @@ state modules
     bigip
     blockdev
     boto3_elasticache
+    boto3_route53
     boto_apigateway
     boto_asg
     boto_cfn
@@ -40,6 +41,7 @@ state modules
     boto_elasticache
     boto_elasticsearch_domain
     boto_elb
+    boto_elbv2
     boto_iam
     boto_iam_role
     boto_iot
@@ -132,10 +134,13 @@ state modules
     layman
     ldap
     libcloud_dns
+    libcloud_loadbalancer
+    libcloud_storage
     linux_acl
     locale
     logadm
     logrotate
+    loop
     lvm
     lvs_server
     lvs_service
@@ -156,6 +161,7 @@ state modules
     mongodb_user
     monit
     mount
+    msteams
     mysql_database
     mysql_grants
     mysql_query
@@ -254,6 +260,7 @@ state modules
     tuned
     uptime
     user
+    vault
     vbox_guest
     victorops
     virt
@@ -281,6 +288,7 @@ state modules
     xmpp
     zabbix_host
     zabbix_hostgroup
+    zabbix_mediatype
     zabbix_user
     zabbix_usergroup
     zcbuildout

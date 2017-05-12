@@ -814,6 +814,7 @@ def urlencoded_processor(entity):
         body_bytes.seek(0)
         # Patch fp
         entity.fp = body_bytes
+        del contents
     # First call out to CherryPy's default processor
     cherrypy._cpreqbody.process_urlencoded(entity)
     cherrypy._cpreqbody.process_urlencoded(entity)
@@ -836,6 +837,7 @@ def json_processor(entity):
         body = entity.fp.read(fp_out=contents)
         contents.seek(0)
         body = contents.read()
+        del contents
     try:
         cherrypy.serving.request.unserialized_data = json.loads(body)
     except ValueError:
@@ -1355,13 +1357,13 @@ class Jobs(LowDataAdapter):
                 - 2
                 - 6.9141387939453125e-06
         '''
-        lowstate = [{
-            'client': 'runner',
-            'fun': 'jobs.list_job' if jid else 'jobs.list_jobs',
-            'jid': jid,
-        }]
+        lowstate = {'client': 'runner'}
+        if jid:
+            lowstate.update({'fun': 'jobs.list_job', 'jid': jid})
+        else:
+            lowstate.update({'fun': 'jobs.list_jobs'})
 
-        cherrypy.request.lowstate = lowstate
+        cherrypy.request.lowstate = [lowstate]
         job_ret_info = list(self.exec_lowstate(
             token=cherrypy.session.get('token')))
 

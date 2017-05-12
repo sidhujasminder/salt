@@ -60,12 +60,6 @@ from salt.utils.nb_popen import NonBlockingPopen
 from salt.exceptions import SaltClientError
 
 try:
-    from salt.utils.gitfs import HAS_GITPYTHON, HAS_PYGIT2
-    HAS_GITFS = HAS_GITPYTHON or HAS_PYGIT2
-except ImportError:
-    HAS_GITFS = False
-
-try:
     import salt.master
 except ImportError:
     # Not required for raet tests
@@ -168,6 +162,7 @@ class SocketServerRequestHandler(socketserver.StreamRequestHandler):
                     record = logging.makeLogRecord(record_dict)
                     logger = logging.getLogger(record.name)
                     logger.handle(record)
+                    del record_dict
             except (EOFError, KeyboardInterrupt, SystemExit):
                 break
             except socket.error as exc:
@@ -208,14 +203,6 @@ class TestDaemon(object):
 
         # Set up PATH to mockbin
         self._enter_mockbin()
-
-        if not HAS_GITFS:
-            sys.stdout.write(
-                ' * {LIGHT_RED}No suitable provider for git_pillar is installed. Install\n'
-                '   GitPython or Pygit2.{ENDC}\n'.format(
-                    **self.colors
-                )
-            )
 
         if self.parser.options.transport == 'zeromq':
             self.start_zeromq_daemons()

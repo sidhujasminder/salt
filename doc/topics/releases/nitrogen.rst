@@ -47,9 +47,9 @@ has now been extended to pillar SLS files as well. See :ref:`here
 Grains Changes
 ==============
 
-- The ``os_release`` grain has been changed from a string to an integer.
-  State files, especially those using a templating language like Jinja
-  may need to be adjusted to account for this change.
+- The ``osmajorrelease`` grain has been changed from a string to an integer.
+  State files, especially those using a templating language like Jinja, may
+  need to be adjusted to account for this change.
 - Add ability to specify disk backing mode in the VMWare salt cloud profile.
 
 State Module Changes
@@ -61,48 +61,50 @@ State Module Changes
   start/stop the service using the ``--no-block`` flag in the ``systemctl``
   command. On non-systemd minions, a warning will be issued.
 
-- The :py:func:`module.run <salt.states.module.run>` state has dropped its previous
-  syntax with ``m_`` prefix for reserved keywords. Additionally, it allows
-  running several functions in a batch.
+- The :py:func:`module.run <salt.states.module.run>` state has dropped its
+  previous syntax with ``m_`` prefix for reserved keywords. Additionally, it
+  allows running several functions in a batch.
 
-.. note::
-    It is nesessary to explicitly turn on the new behaviour (see below)
+  .. note::
+      It is necessary to explicitly turn on the new behavior (see below)
 
-  Before and after:
+  .. code-block:: yaml
 
-.. code-block:: yaml
+      # Before
+      run_something:
+        module.run:
+          - name: mymodule.something
+          - m_name: 'some name'
+          - kwargs: {
+            first_arg: 'one',
+            second_arg: 'two',
+            do_stuff: 'True'
+          }
 
-    # Before
-    run_something:
-      module.run:
-        - name: mymodule.something
-        - m_name: 'some name'
-        - kwargs: {
-          first_arg: 'one',
-          second_arg: 'two',
-          do_stuff: 'True'
-        }
-
-    # After
-    run_something:
-      module.run:
-        mymodule.something:
-          - name: some name
-          - first_arg: one
-          - second_arg: two
-          - do_stuff: True
-
-- Previous behaviour of the function :py:func:`module.run <salt.states.module.run>` is
-  still kept by default and can be bypassed in case you want to use behaviour above.
-  Please keep in mind that the old syntax will no longer be supported in the ``Oxygen``
-  release of Salt. To enable the new behavior, add the following to the minion config file:
+      # After
+      run_something:
+        module.run:
+          mymodule.something:
+            - name: some name
+            - first_arg: one
+            - second_arg: two
+            - do_stuff: True
 
 
-.. code-block:: yaml
+  Since a lot of users are already using :py:func:`module.run
+  <salt.states.module.run>` states, this new behavior must currently be
+  explicitly turned on, to allow users to take their time updating their SLS
+  files. However, please keep in mind that the new syntax will take effect in
+  the next feature release of Salt (Oxygen) and the old usage will no longer be
+  supported at that time.
 
-    use_superseded:
-      - module.run
+  To enable the new behavior for :py:func:`module.run <salt.states.module.run>`,
+  add the following to the minion config file:
 
+  .. code-block:: yaml
+
+      use_superseded:
+        - module.run
 
 
 Execution Module Changes
@@ -128,6 +130,8 @@ Execution Module Changes
 - A ``pkg.list_repo_pkgs`` function has been added for both
   :py:func:`Debian/Ubuntu <salt.modules.aptpkg.list_repo_pkgs>` and
   :py:func:`Arch Linux <salt.modules.pacman.list_repo_pkgs>`-based distros.
+- The :mod:`system <salt.modules.system>` module changed its return format
+  from "HH:MM AM/PM" to "HH:MM:SS AM/PM" for `get_system_time`.
 
 
 Proxy Module Changes
@@ -149,29 +153,26 @@ connection with the remote device only when required.
 Wildcard Versions in :py:func:`pkg.installed <salt.states.pkg.installed>` States
 ================================================================================
 
-The :py:func:`pkg.installed <salt.states.pkg.installed>` state now supports
-wildcards in package versions, for the following platforms:
+- The :py:func:`pkg.installed <salt.states.pkg.installed>` state now supports
+  wildcards in package versions, for the following platforms:
 
-- Debian/Ubuntu
-- RHEL/CentOS
-- Arch Linux
+  - Debian/Ubuntu
+  - RHEL/CentOS
+  - Arch Linux
 
-This support also extends to any derivatives of these distros, which use the
-:mod:`aptpkg <salt.modules.aptpkg>`, :mod:`yumpkg <salt.modules.yumpkg>`, or
-:mod:`pacman <salt.modules.pacman>` providers for the ``pkg`` virtual module.
+  This support also extends to any derivatives of these distros, which use the
+  :mod:`aptpkg <salt.modules.aptpkg>`, :mod:`yumpkg <salt.modules.yumpkg>`, or
+  :mod:`pacman <salt.modules.pacman>` providers for the ``pkg`` virtual module.
 
-Using wildcards can be useful for packages where the release name is built into
-the version in some way, such as for RHEL/CentOS which typically has version
-numbers like ``1.2.34-5.el7``. An example of the usage for this would be:
+  Using wildcards can be useful for packages where the release name is built into
+  the version in some way, such as for RHEL/CentOS which typically has version
+  numbers like ``1.2.34-5.el7``. An example of the usage for this would be:
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-    mypkg:
-      pkg.installed:
-        - version: '1.2.34*'
-
-- The :mod:`system <salt.modules.system>` module changed the returned format
-  from "HH:MM AM/PM" to "HH:MM:SS AM/PM" for `get_system_time`.
+      mypkg:
+        pkg.installed:
+          - version: '1.2.34*'
 
 Master Configuration Additions
 ==============================
@@ -246,7 +247,7 @@ have been improved, enhanced and widenened in scope:
 
 New modules:
 
-- :mod:`Netconfig state <salt.states.netconfig>` - Manage the configuration
+- :mod:`Netconfig state module <salt.states.netconfig>` - Manage the configuration
   of network devices using arbitrary templates and the Salt-specific
   advanced templating methodologies.
 - :mod:`Network ACL execution module <salt.modules.napalm_acl>` - Generate and
@@ -255,8 +256,10 @@ New modules:
   configuration. It only requires writing the pillar structure correctly!
 - :mod:`NAPALM YANG execution module <salt.modules.napalm_yang_mod>` - Parse,
   generate and load native device configuration in a standard way,
-  using the OpenConfig/IETF models. This module cotains also helpers for
+  using the OpenConfig/IETF models. This module contains also helpers for
   the states.
+- :mod:`NAPALM YANG state module <salt.states.netyang>` - Manage the
+  network device configuration according to the YANG models (OpenConfig or IETF).
 - :mod:`NET finder <salt.runners.net>` - Runner to find details easily and
   fast. It's smart enough to know what you are looking for. It will search
   in the details of the network interfaces, IP addresses, MAC address tables,
@@ -266,6 +269,11 @@ New modules:
   from the napalm-logs library into the Salt event bus. The events are based
   on the syslog messages from the network devices and structured following
   the OpenConfig/IETF YANG models.
+- :mod:`NAPALM Helpers <salt.modules.napalm>` - Generic helpers for
+  NAPALM-related operations. For example, the
+  :mod:`Compliance report <salt.modules.napalm.compliance_report>` function
+  can be used inside the state modules to compare the expected and the
+  existing configuration.
 
 New functions:
 
@@ -346,6 +354,18 @@ This is similar to how Salt handles MySQL, MongoDB, Zabbix, and other cases
 where the same execution module is used to manage several different kinds
 of objects (users, databases, roles, etc.).
 
+.. note::
+    With the `Moby announcement`_ coming at this year's DockerCon_, Salt's
+    :mod:`docker <salt.modules.dockermod>` execution module (as well as the
+    state modules) work interchangably when **docker** is replaced with
+    **moby** (e.g.  :py:func:`moby_container.running
+    <salt.states.docker_container.running>`, :py:func:`moby_image.present
+    <salt.states.docker_image.present>`, :py:func:`moby.inspect_container
+    <salt.modules.dockermod.inspect_container>`, etc.)
+
+.. _`Moby announcement`: https://blog.docker.com/2017/04/introducing-the-moby-project/
+.. _DockerCon: http://2017.dockercon.com/
+
 The old syntax will continue to work until the **Fluorine** release of Salt.
 The old ``dockerng`` naming will also continue to work until that release, so
 no immediate changes need to be made to your SLS files (unless you were still
@@ -394,6 +414,15 @@ so it is now possible to target minions identically through `salt` and `salt-ssh
 Using the new ``roster_order`` configuration syntax it's now possible to compose a roster out of any combination
 of grains, pillar and mine data and even Salt SDB URLs.
 The new release is also fully IPv4 and IPv6 enabled and even has support for CIDR ranges.
+
+New Modules
+===========
+
+Outputters
+----------
+
+- :mod:`table <salt.output.table_out>`
+- :mod:`profile <salt.output.profile>`
 
 Deprecations
 ============

@@ -111,7 +111,7 @@ VALID_OPTS = {
     'master': (string_types, list),
 
     # The TCP/UDP port of the master to connect to in order to listen to publications
-    'master_port': int,
+    'master_port': (string_types, int),
 
     # The behaviour of the minion when connecting to a master. Can specify 'failover',
     # 'disable' or 'func'. If 'func' is specified, the 'master' option should be set to an
@@ -607,6 +607,8 @@ VALID_OPTS = {
     'gitfs_passphrase': str,
     'gitfs_env_whitelist': list,
     'gitfs_env_blacklist': list,
+    'gitfs_saltenv_whitelist': list,
+    'gitfs_saltenv_blacklist': list,
     'gitfs_ssl_verify': bool,
     'gitfs_global_lock': bool,
     'gitfs_saltenv': list,
@@ -618,6 +620,8 @@ VALID_OPTS = {
     'hgfs_branch_method': str,
     'hgfs_env_whitelist': list,
     'hgfs_env_blacklist': list,
+    'hgfs_saltenv_whitelist': list,
+    'hgfs_saltenv_blacklist': list,
     'svnfs_remotes': list,
     'svnfs_mountpoint': str,
     'svnfs_root': str,
@@ -626,6 +630,8 @@ VALID_OPTS = {
     'svnfs_tags': str,
     'svnfs_env_whitelist': list,
     'svnfs_env_blacklist': list,
+    'svnfs_saltenv_whitelist': list,
+    'svnfs_saltenv_blacklist': list,
     'minionfs_env': str,
     'minionfs_mountpoint': str,
     'minionfs_whitelist': list,
@@ -785,6 +791,12 @@ VALID_OPTS = {
 
     # The logfile location for salt-key
     'key_logfile': str,
+
+    # The upper bound for the random number of seconds that a minion should
+    # delay when starting in up before it connects to a master. This can be
+    # used to mitigate a thundering-herd scenario when many minions start up
+    # at once and attempt to all connect immediately to the master
+    'random_startup_delay': int,
 
     # The source location for the winrepo sls files
     # (used by win_pkg.py, minion only)
@@ -1029,6 +1041,13 @@ VALID_OPTS = {
     # django auth
     'django_auth_path': str,
     'django_auth_settings': str,
+
+    # Number of times to try to auth with the master on a reconnect with the
+    # tcp transport
+    'tcp_authentication_retries': int,
+
+    # Permit or deny allowing minions to request revoke of its own key
+    'allow_minion_key_revoke': bool,
 }
 
 # default configurations
@@ -1064,6 +1083,7 @@ DEFAULT_MINION_OPTS = {
     'renderer': 'yaml_jinja',
     'renderer_whitelist': [],
     'renderer_blacklist': [],
+    'random_startup_delay': 0,
     'failhard': False,
     'autoload_dynamic_modules': True,
     'environment': None,
@@ -1137,6 +1157,8 @@ DEFAULT_MINION_OPTS = {
     'gitfs_passphrase': '',
     'gitfs_env_whitelist': [],
     'gitfs_env_blacklist': [],
+    'gitfs_saltenv_whitelist': [],
+    'gitfs_saltenv_blacklist': [],
     'gitfs_global_lock': True,
     'gitfs_ssl_verify': True,
     'gitfs_saltenv': [],
@@ -1169,6 +1191,7 @@ DEFAULT_MINION_OPTS = {
     'file_buffer_size': 262144,
     'tcp_pub_port': 4510,
     'tcp_pull_port': 4511,
+    'tcp_authentication_retries': 5,
     'log_file': os.path.join(salt.syspaths.LOGS_DIR, 'minion'),
     'log_level': 'warning',
     'log_level_logfile': None,
@@ -1360,6 +1383,8 @@ DEFAULT_MASTER_OPTS = {
     'gitfs_passphrase': '',
     'gitfs_env_whitelist': [],
     'gitfs_env_blacklist': [],
+    'gitfs_saltenv_whitelist': [],
+    'gitfs_saltenv_blacklist': [],
     'gitfs_global_lock': True,
     'gitfs_ssl_verify': True,
     'gitfs_saltenv': [],
@@ -1371,6 +1396,8 @@ DEFAULT_MASTER_OPTS = {
     'hgfs_branch_method': 'branches',
     'hgfs_env_whitelist': [],
     'hgfs_env_blacklist': [],
+    'hgfs_saltenv_whitelist': [],
+    'hgfs_saltenv_blacklist': [],
     'show_timeout': True,
     'show_jid': False,
     'svnfs_remotes': [],
@@ -1381,6 +1408,8 @@ DEFAULT_MASTER_OPTS = {
     'svnfs_tags': 'tags',
     'svnfs_env_whitelist': [],
     'svnfs_env_blacklist': [],
+    'svnfs_saltenv_whitelist': [],
+    'svnfs_saltenv_blacklist': [],
     'max_event_size': 1048576,
     'minionfs_env': 'base',
     'minionfs_mountpoint': '',
@@ -1582,6 +1611,7 @@ DEFAULT_MASTER_OPTS = {
     'clean_dynamic_modules': True,
     'django_auth_path': '',
     'django_auth_settings': '',
+    'allow_minion_key_revoke': True,
 }
 
 
