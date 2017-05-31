@@ -6,6 +6,7 @@
 # Import Python Libs
 from __future__ import absolute_import
 import os
+from xml.dom import minidom
 
 # Import Salt Testing Libs
 from tests.support.mixins import LoaderModuleMockMixin
@@ -27,6 +28,7 @@ from salt.exceptions import CommandExecutionError
 # Import 3rd-party libs
 from salt.ext.six.moves import configparser
 import salt.ext.six as six
+import salt.utils.pkg
 
 
 class ZyppCallMock(object):
@@ -49,9 +51,6 @@ def get_test_data(filename):
                 os.path.join(
                     os.path.dirname(os.path.abspath(__file__)), 'zypp'), filename)) as rfh:
         return rfh.read()
-
-
-# Import Salt Libs
 
 
 @skipIf(NO_MOCK, NO_MOCK_REASON)
@@ -266,10 +265,11 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
         }
 
         with patch.dict(zypper.__salt__, {'cmd.run_all': MagicMock(return_value=run_out)}):
-            result = zypper.refresh_db()
-            self.assertEqual(result.get("openSUSE-Leap-42.1-LATEST"), False)
-            self.assertEqual(result.get("openSUSE-Leap-42.1-Update"), False)
-            self.assertEqual(result.get("openSUSE-Leap-42.1-Update-Non-Oss"), True)
+            with patch.object(salt.utils.pkg, 'clear_rtag', Mock()):
+                result = zypper.refresh_db()
+                self.assertEqual(result.get("openSUSE-Leap-42.1-LATEST"), False)
+                self.assertEqual(result.get("openSUSE-Leap-42.1-Update"), False)
+                self.assertEqual(result.get("openSUSE-Leap-42.1-Update-Non-Oss"), True)
 
     def test_info_installed(self):
         '''
@@ -377,6 +377,12 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                     self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
                     zypper_mock.assert_any_call('update', '--auto-agree-with-licenses')
 
+                with patch('salt.modules.zypper.list_pkgs',
+                           MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1,1.2"}])):
+                    ret = zypper.upgrade()
+                    self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
+                    zypper_mock.assert_any_call('update', '--auto-agree-with-licenses')
+
                 with patch('salt.modules.zypper.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}])):
                     ret = zypper.upgrade(dist_upgrade=True)
                     self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
@@ -396,6 +402,22 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                     ret = zypper.upgrade(dist_upgrade=True, fromrepo=["Dummy", "Dummy2"], novendorchange=True)
                     self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
                     zypper_mock.assert_any_call('dist-upgrade', '--auto-agree-with-licenses', '--from', "Dummy", '--from', 'Dummy2', '--no-allow-vendor-change')
+
+    def test_upgrade_kernel(self):
+        '''
+        Test kernel package upgrade success.
+
+        :return:
+        '''
+        with patch.dict(zypper.__grains__, {'osrelease_info': [12, 1]}), \
+             patch('salt.modules.zypper.refresh_db', MagicMock(return_value=True)), \
+             patch('salt.modules.zypper._systemd_scope', MagicMock(return_value=False)):
+            with patch.dict(zypper.__salt__, {'pkg_resource.parse_targets': MagicMock(return_value=(['kernel-default'], None))}):
+                with patch('salt.modules.zypper.__zypper__.noraise.call', MagicMock()):
+                    with patch('salt.modules.zypper.list_pkgs', MagicMock(side_effect=[
+                        {"kernel-default": "3.12.49-11.1"}, {"kernel-default": "3.12.49-11.1,3.12.51-60.20.2"}])):
+                        ret = zypper.install('kernel-default', '--auto-agree-with-licenses')
+                        self.assertDictEqual(ret, {"kernel-default": {"old": "3.12.49-11.1", "new": "3.12.51-60.20.2"}})
 
     def test_upgrade_failure(self):
         '''
@@ -916,3 +938,177 @@ Repository 'DUMMY' not found by its alias, number, or URI.
             zypper.__zypper__.refreshable.xml.call.assert_called_once_with(
                 '--gpg-auto-import-keys', 'mr', '--refresh', name
             )
+
+    def test_wildcard_to_query_match_all(self):
+        '''
+        Test wildcard to query match all pattern
+        :return:
+        '''
+        xmldoc = """<?xml version='1.0'?><stream>
+        <search-result version="0.0"><solvable-list>
+        <solvable status="installed" name="libzypp" kind="package" edition="16.2.4-19.5" arch="x86_64" repository="SLE-12-SP2-x86_64-Pool"/>
+        <solvable status="not-installed" name="libzypp" kind="srcpackage" edition="16.3.2-25.1" arch="noarch" repository="SLE-12-SP2-x86_64-Update"/>
+        <solvable status="not-installed" name="libzypp" kind="srcpackage" edition="16.5.2-27.9.1" arch="noarch" repository="SLE-12-SP2-x86_64-Update"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="16.3.2-25.1" arch="x86_64" repository="SLE-12-SP2-x86_64-Update"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="16.5.2-27.9.1" arch="x86_64" repository="SLE-12-SP2-x86_64-Update"/>
+        <solvable status="installed" name="libzypp" kind="package" edition="16.2.4-19.5" arch="x86_64" repository="(System Packages)"/>
+        </solvable-list></search-result></stream>
+                """
+        _zpr = MagicMock()
+        _zpr.nolock.xml.call = MagicMock(return_value=minidom.parseString(xmldoc))
+        wcard = zypper.Wildcard(_zpr)
+        wcard.name, wcard.version = 'libzypp', '*'
+        assert wcard._get_scope_versions(wcard._get_available_versions()) == [u'16.2.4-19.5', u'16.3.2-25.1', u'16.5.2-27.9.1']
+
+    def test_wildcard_to_query_multiple_asterisk(self):
+        '''
+        Test wildcard to query match multiple asterisk
+        :return:
+        '''
+        xmldoc = """<?xml version='1.0'?><stream>
+        <search-result version="0.0"><solvable-list>
+        <solvable status="installed" name="libzypp" kind="package" edition="16.2.4-19.5" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="16.2.5-25.1" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="16.2.6-27.9.1" arch="x86_64" repository="foo"/>
+        </solvable-list></search-result></stream>
+        """
+
+        _zpr = MagicMock()
+        _zpr.nolock.xml.call = MagicMock(return_value=minidom.parseString(xmldoc))
+        wcard = zypper.Wildcard(_zpr)
+        wcard.name, wcard.version = 'libzypp', '16.2.*-2*'
+        assert wcard._get_scope_versions(wcard._get_available_versions()) == [u'16.2.5-25.1', u'16.2.6-27.9.1']
+
+    def test_wildcard_to_query_exact_match_at_end(self):
+        '''
+        Test wildcard to query match exact pattern at the end
+        :return:
+        '''
+        xmldoc = """<?xml version='1.0'?><stream>
+        <search-result version="0.0"><solvable-list>
+        <solvable status="installed" name="libzypp" kind="package" edition="16.2.4-19.5" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="16.2.5-25.1" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="16.2.6-27.9.1" arch="x86_64" repository="foo"/>
+        </solvable-list></search-result></stream>
+        """
+
+        _zpr = MagicMock()
+        _zpr.nolock.xml.call = MagicMock(return_value=minidom.parseString(xmldoc))
+        wcard = zypper.Wildcard(_zpr)
+        wcard.name, wcard.version = 'libzypp', '16.2.5*'
+        assert wcard._get_scope_versions(wcard._get_available_versions()) == [u'16.2.5-25.1']
+
+    def test_wildcard_to_query_exact_match_at_beginning(self):
+        '''
+        Test wildcard to query match exact pattern at the beginning
+        :return:
+        '''
+        xmldoc = """<?xml version='1.0'?><stream>
+        <search-result version="0.0"><solvable-list>
+        <solvable status="installed" name="libzypp" kind="package" edition="16.2.4-19.5" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="16.2.5-25.1" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="17.2.6-27.9.1" arch="x86_64" repository="foo"/>
+        </solvable-list></search-result></stream>
+        """
+
+        _zpr = MagicMock()
+        _zpr.nolock.xml.call = MagicMock(return_value=minidom.parseString(xmldoc))
+        wcard = zypper.Wildcard(_zpr)
+        wcard.name, wcard.version = 'libzypp', '*.1'
+        assert wcard._get_scope_versions(wcard._get_available_versions()) == [u'16.2.5-25.1', u'17.2.6-27.9.1']
+
+    def test_wildcard_to_query_usage(self):
+        '''
+        Test wildcard to query usage.
+
+        :return:
+        '''
+        xmldoc = """<?xml version='1.0'?><stream>
+        <search-result version="0.0"><solvable-list>
+        <solvable status="installed" name="libzypp" kind="package" edition="16.2.4-19.5" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="16.2.5-25.1" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="17.2.6-27.9.1" arch="x86_64" repository="foo"/>
+        </solvable-list></search-result></stream>
+        """
+        _zpr = MagicMock()
+        _zpr.nolock.xml.call = MagicMock(return_value=minidom.parseString(xmldoc))
+        assert zypper.Wildcard(_zpr)('libzypp', '16.2.4*') == '16.2.4-19.5'
+        assert zypper.Wildcard(_zpr)('libzypp', '16.2*') == '16.2.5-25.1'
+        assert zypper.Wildcard(_zpr)('libzypp', '*6-*') == '17.2.6-27.9.1'
+        assert zypper.Wildcard(_zpr)('libzypp', '*.1') == '17.2.6-27.9.1'
+
+    def test_wildcard_to_query_noversion(self):
+        '''
+        Test wildcard to query when no version has been passed on.
+
+        :return:
+        '''
+        xmldoc = """<?xml version='1.0'?><stream>
+        <search-result version="0.0"><solvable-list>
+        <solvable status="installed" name="libzypp" kind="package" edition="16.2.4-19.5" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="16.2.5-25.1" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="17.2.6-27.9.1" arch="x86_64" repository="foo"/>
+        </solvable-list></search-result></stream>
+        """
+        _zpr = MagicMock()
+        _zpr.nolock.xml.call = MagicMock(return_value=minidom.parseString(xmldoc))
+        assert zypper.Wildcard(_zpr)('libzypp', None) is None
+
+    def test_wildcard_to_query_typecheck(self):
+        '''
+        Test wildcard to query typecheck.
+
+        :return:
+        '''
+        xmldoc = """<?xml version='1.0'?><stream>
+        <search-result version="0.0"><solvable-list>
+        <solvable status="installed" name="libzypp" kind="package" edition="16.2.4-19.5" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="16.2.5-25.1" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="17.2.6-27.9.1" arch="x86_64" repository="foo"/>
+        </solvable-list></search-result></stream>
+        """
+        _zpr = MagicMock()
+        _zpr.nolock.xml.call = MagicMock(return_value=minidom.parseString(xmldoc))
+        assert isinstance(zypper.Wildcard(_zpr)('libzypp', '*.1'), str)
+
+    def test_wildcard_to_query_condition_preservation(self):
+        '''
+        Test wildcard to query Zypper condition preservation.
+
+        :return:
+        '''
+        xmldoc = """<?xml version='1.0'?><stream>
+        <search-result version="0.0"><solvable-list>
+        <solvable status="installed" name="libzypp" kind="package" edition="16.2.4-19.5" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="16.2.5-25.1" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="17.2.6-27.9.1" arch="x86_64" repository="foo"/>
+        </solvable-list></search-result></stream>
+        """
+        _zpr = MagicMock()
+        _zpr.nolock.xml.call = MagicMock(return_value=minidom.parseString(xmldoc))
+
+        for op in zypper.Wildcard.Z_OP:
+            assert zypper.Wildcard(_zpr)('libzypp', '{0}*.1'.format(op)) == '{0}17.2.6-27.9.1'.format(op)
+
+        # Auto-fix feature: moves operator from end to front
+        for op in zypper.Wildcard.Z_OP:
+            assert zypper.Wildcard(_zpr)('libzypp', '16*{0}'.format(op)) == '{0}16.2.5-25.1'.format(op)
+
+    def test_wildcard_to_query_unsupported_operators(self):
+        '''
+        Test wildcard to query unsupported operators.
+
+        :return:
+        '''
+        xmldoc = """<?xml version='1.0'?><stream>
+        <search-result version="0.0"><solvable-list>
+        <solvable status="installed" name="libzypp" kind="package" edition="16.2.4-19.5" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="16.2.5-25.1" arch="x86_64" repository="foo"/>
+        <solvable status="other-version" name="libzypp" kind="package" edition="17.2.6-27.9.1" arch="x86_64" repository="foo"/>
+        </solvable-list></search-result></stream>
+        """
+        _zpr = MagicMock()
+        _zpr.nolock.xml.call = MagicMock(return_value=minidom.parseString(xmldoc))
+        with self.assertRaises(CommandExecutionError):
+            for op in ['>>', '==', '<<', '+']:
+                zypper.Wildcard(_zpr)('libzypp', '{0}*.1'.format(op))

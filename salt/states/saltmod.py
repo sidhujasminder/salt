@@ -66,6 +66,8 @@ def state(name,
         tgt_type='glob',
         expr_form=None,
         ret='',
+        ret_config=None,
+        ret_kwargs=None,
         highstate=None,
         sls=None,
         top=None,
@@ -105,6 +107,12 @@ def state(name,
 
     ret
         Optionally set a single or a list of returners to use
+
+    ret_config
+        Use an alternative returner configuration
+
+    ret_kwargs
+        Override individual returner configuration items
 
     highstate
         Defaults to None, if set to True the target systems will ignore any
@@ -198,6 +206,12 @@ def state(name,
     '''
     cmd_kw = {'arg': [], 'kwarg': {}, 'ret': ret, 'timeout': timeout}
 
+    if ret_config:
+        cmd_kw['ret_config'] = ret_config
+
+    if ret_kwargs:
+        cmd_kw['ret_kwargs'] = ret_kwargs
+
     state_ret = {'name': name,
                  'changes': {},
                  'comment': '',
@@ -252,7 +266,7 @@ def state(name,
     elif __opts__.get('pillarenv'):
         cmd_kw['kwarg']['pillarenv'] = __opts__['pillarenv']
 
-    cmd_kw['kwarg']['saltenv'] = saltenv
+    cmd_kw['kwarg']['saltenv'] = saltenv if saltenv is not None else __env__
     cmd_kw['kwarg']['queue'] = queue
 
     if isinstance(concurrent, bool):
@@ -385,6 +399,8 @@ def function(
         tgt_type='glob',
         expr_form=None,
         ret='',
+        ret_config=None,
+        ret_kwargs=None,
         expect_minions=False,
         fail_minions=None,
         fail_function=None,
@@ -417,6 +433,12 @@ def function(
 
     ret
         Optionally set a single or a list of returners to use
+
+    ret_config
+        Use an alternative returner configuration
+
+    ret_kwargs
+        Override individual returner configuration items
 
     expect_minions
         An optional boolean for failing if some minions do not respond
@@ -474,6 +496,13 @@ def function(
     cmd_kw['ssh'] = ssh
     cmd_kw['expect_minions'] = expect_minions
     cmd_kw['_cmd_meta'] = True
+
+    if ret_config:
+        cmd_kw['ret_config'] = ret_config
+
+    if ret_kwargs:
+        cmd_kw['ret_kwargs'] = ret_kwargs
+
     fun = name
     if __opts__['test'] is True:
         func_ret['comment'] = (
@@ -694,6 +723,16 @@ def runner(name, **kwargs):
             'Unable to fire args event due to missing __orchestration_jid__'
         )
         jid = None
+
+    if __opts__.get('test', False):
+        ret = {
+            'name': name,
+            'result': True,
+            'changes': {},
+            'comment': "Runner function '{0}' would be executed.".format(name)
+        }
+        return ret
+
     out = __salt__['saltutil.runner'](name,
                                       __orchestration_jid__=jid,
                                       __env__=__env__,
@@ -751,6 +790,12 @@ def wheel(name, **kwargs):
             'Unable to fire args event due to missing __orchestration_jid__'
         )
         jid = None
+
+    if __opts__.get('test', False):
+        ret['result'] = True,
+        ret['comment'] = "Wheel function '{0}' would be executed.".format(name)
+        return ret
+
     out = __salt__['saltutil.wheel'](name,
                                      __orchestration_jid__=jid,
                                      __env__=__env__,

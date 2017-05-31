@@ -101,7 +101,6 @@ import salt.log.setup
 
 from salt.config import DEFAULT_MINION_OPTS
 from salt.defaults import DEFAULT_TARGET_DELIM
-from salt.executors import FUNCTION_EXECUTORS
 from salt.utils.debug import enable_sigusr1_handler
 from salt.utils.event import tagify
 from salt.utils.odict import OrderedDict
@@ -288,34 +287,8 @@ def load_args_and_kwargs(func, args, data=None, ignore_invalid=False):
     invalid_kwargs = []
 
     for arg in args:
-        if isinstance(arg, six.string_types):
-            string_arg, string_kwarg = salt.utils.args.parse_input([arg], condition=False)  # pylint: disable=W0632
-            if string_arg:
-                # Don't append the version that was just derived from parse_cli
-                # above, that would result in a 2nd call to
-                # salt.utils.cli.yamlify_arg(), which could mangle the input.
-                _args.append(arg)
-            elif string_kwarg:
-                salt.utils.warn_until(
-                    'Nitrogen',
-                    'The list of function args and kwargs should be parsed '
-                    'by salt.utils.args.parse_input() before calling '
-                    'salt.minion.load_args_and_kwargs().'
-                )
-                if argspec.keywords or next(six.iterkeys(string_kwarg)) in argspec.args:
-                    # Function supports **kwargs or is a positional argument to
-                    # the function.
-                    _kwargs.update(string_kwarg)
-                else:
-                    # **kwargs not in argspec and parsed argument name not in
-                    # list of positional arguments. This keyword argument is
-                    # invalid.
-                    for key, val in six.iteritems(string_kwarg):
-                        invalid_kwargs.append('{0}={1}'.format(key, val))
-                continue
-
-        # if the arg is a dict with __kwarg__ == True, then its a kwarg
-        elif isinstance(arg, dict) and arg.pop('__kwarg__', False) is True:
+        if isinstance(arg, dict) and arg.pop('__kwarg__', False) is True:
+            # if the arg is a dict with __kwarg__ == True, then its a kwarg
             for key, val in six.iteritems(arg):
                 if argspec.keywords or key in argspec.args:
                     # Function supports **kwargs or is a positional argument to
@@ -329,7 +302,18 @@ def load_args_and_kwargs(func, args, data=None, ignore_invalid=False):
             continue
 
         else:
-            _args.append(arg)
+            string_kwarg = salt.utils.args.parse_input([arg], condition=False)[1]  # pylint: disable=W0632
+            if string_kwarg:
+                log.critical(
+                    'String kwarg(s) %s passed to '
+                    'salt.minion.load_args_and_kwargs(). This is no longer '
+                    'supported, so the kwarg(s) will be ignored. Arguments '
+                    'passed to salt.minion.load_args_and_kwargs() should be '
+                    'passed to salt.utils.args.parse_input() first to load '
+                    'and condition them properly.', string_kwarg
+                )
+            else:
+                _args.append(arg)
 
     if invalid_kwargs and not ignore_invalid:
         salt.utils.invalid_kwargs(invalid_kwargs)
@@ -1439,31 +1423,23 @@ class Minion(MinionBase):
                     data)
                 minion_instance.functions.pack['__context__']['retcode'] = 0
 
-                executors = data.get('module_executors') or opts.get('module_executors', ['direct_call.get'])
+                executors = data.get('module_executors') or opts.get('module_executors', ['direct_call'])
                 if isinstance(executors, six.string_types):
                     executors = [executors]
                 elif not isinstance(executors, list) or not executors:
                     raise SaltInvocationError("Wrong executors specification: {0}. String or non-empty list expected".
                         format(executors))
-                if opts.get('sudo_user', '') and executors[-1] != 'sudo.get':
-                    if executors[-1] in FUNCTION_EXECUTORS:
-                        executors[-1] = 'sudo.get'  # replace
-                    else:
-                        executors.append('sudo.get')  # append
+                if opts.get('sudo_user', '') and executors[-1] != 'sudo':
+                    executors[-1] = 'sudo'  # replace the last one with sudo
                 log.trace('Executors list {0}'.format(executors))  # pylint: disable=no-member
 
-                # Get executors
-                def get_executor(name):
-                    executor_class = minion_instance.executors.get(name)
-                    if executor_class is None:
+                for name in executors:
+                    fname = '{0}.execute'.format(name)
+                    if fname not in minion_instance.executors:
                         raise SaltInvocationError("Executor '{0}' is not available".format(name))
-                    return executor_class
-                # Get the last one that is function executor
-                executor = get_executor(executors.pop())(opts, data, func, args, kwargs)
-                # Instantiate others from bottom to the top
-                for executor_name in reversed(executors):
-                    executor = get_executor(executor_name)(opts, data, executor)
-                return_data = executor.execute()
+                    return_data = minion_instance.executors[fname](opts, data, func, args, kwargs)
+                    if return_data is not None:
+                        break
 
                 if isinstance(return_data, types.GeneratorType):
                     ind = 0
