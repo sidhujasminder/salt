@@ -56,6 +56,7 @@ def sync_all(saltenv='base', extmod_whitelist=None, extmod_blacklist=None):
     ret['utils'] = sync_utils(saltenv=saltenv, extmod_whitelist=extmod_whitelist, extmod_blacklist=extmod_blacklist)
     ret['sdb'] = sync_sdb(saltenv=saltenv, extmod_whitelist=extmod_whitelist, extmod_blacklist=extmod_blacklist)
     ret['cache'] = sync_cache(saltenv=saltenv, extmod_whitelist=extmod_whitelist, extmod_blacklist=extmod_blacklist)
+    ret['fileserver'] = sync_fileserver(saltenv=saltenv, extmod_whitelist=extmod_whitelist, extmod_blacklist=extmod_blacklist)
     ret['tops'] = sync_tops(saltenv=saltenv, extmod_whitelist=extmod_whitelist, extmod_blacklist=extmod_blacklist)
     return ret
 
@@ -446,11 +447,11 @@ def sync_cache(saltenv='base', extmod_whitelist=None, extmod_blacklist=None):
                                    extmod_blacklist=extmod_blacklist)[0]
 
 
-def sync_clouds(saltenv='base', extmod_whitelist=None, extmod_blacklist=None):
+def sync_fileserver(saltenv='base', extmod_whitelist=None, extmod_blacklist=None):
     '''
-    .. versionadded:: Nitrogen
+    .. versionadded:: Oxygen
 
-    Sync utils modules from ``salt://_cloud`` to the master
+    Sync utils modules from ``salt://_fileserver`` to the master
 
     saltenv : base
         The fileserver environment from which to sync. To sync from more than
@@ -466,7 +467,59 @@ def sync_clouds(saltenv='base', extmod_whitelist=None, extmod_blacklist=None):
 
     .. code-block:: bash
 
-        salt-run saltutil.sync_cloud
+        salt-run saltutil.sync_fileserver
     '''
-    return salt.utils.extmods.sync(__opts__, 'cloud', saltenv=saltenv, extmod_whitelist=extmod_whitelist,
+    return salt.utils.extmods.sync(__opts__, 'fileserver', saltenv=saltenv, extmod_whitelist=extmod_whitelist,
+                                   extmod_blacklist=extmod_blacklist)[0]
+
+
+def sync_clouds(saltenv='base', extmod_whitelist=None, extmod_blacklist=None):
+    '''
+    .. versionadded:: Nitrogen
+
+    Sync utils modules from ``salt://_clouds`` to the master
+
+    saltenv : base
+        The fileserver environment from which to sync. To sync from more than
+        one environment, pass a comma-separated list.
+
+    extmod_whitelist : None
+        comma-seperated list of modules to sync
+
+    extmod_blacklist : None
+        comma-seperated list of modules to blacklist based on type
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt-run saltutil.sync_clouds
+    '''
+    return salt.utils.extmods.sync(__opts__, 'clouds', saltenv=saltenv, extmod_whitelist=extmod_whitelist,
+                                   extmod_blacklist=extmod_blacklist)[0]
+
+
+def sync_roster(saltenv='base', extmod_whitelist=None, extmod_blacklist=None):
+    '''
+    .. versionadded:: Nitrogen
+
+    Sync utils modules from ``salt://_roster`` to the master
+
+    saltenv : base
+        The fileserver environment from which to sync. To sync from more than
+        one environment, pass a comma-separated list.
+
+    extmod_whitelist : None
+        comma-seperated list of modules to sync
+
+    extmod_blacklist : None
+        comma-seperated list of modules to blacklist based on type
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt-run saltutil.sync_roster
+    '''
+    return salt.utils.extmods.sync(__opts__, 'roster', saltenv=saltenv, extmod_whitelist=extmod_whitelist,
                                    extmod_blacklist=extmod_blacklist)[0]

@@ -121,7 +121,8 @@ def _get_pip_bin(bin_env):
     if not bin_env:
         which_result = __salt__['cmd.which_bin'](
             ['pip{0}.{1}'.format(*sys.version_info[:2]),
-             'pip', 'pip2', 'pip3', 'pip-python']
+             'pip{0}'.format(sys.version_info[0]),
+             'pip', 'pip-python']
         )
         if salt.utils.is_windows() and six.PY2:
             which_result.encode('string-escape')
@@ -1104,7 +1105,7 @@ def version(bin_env=None):
     '''
     pip_bin = _get_pip_bin(bin_env)
 
-    output = __salt__['cmd.run'](
+    output = __salt__['cmd.run_stdout'](
         '{0} --version'.format(pip_bin), python_shell=False)
     try:
         return re.match(r'^pip (\S+)', output).group(1)

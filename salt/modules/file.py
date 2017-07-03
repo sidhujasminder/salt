@@ -594,7 +594,7 @@ def get_source_sum(file_name='',
         file, used to disambiguate ambiguous matches.
 
     saltenv : base
-        Salt fileserver environment from which to retrive the source_hash. This
+        Salt fileserver environment from which to retrieve the source_hash. This
         value will only be used when ``source_hash`` refers to a file on the
         Salt fileserver (i.e. one beginning with ``salt://``).
 
@@ -1555,7 +1555,7 @@ def _regex_to_static(src, regex):
         return None
 
     try:
-        src = re.search(regex, src)
+        src = re.search(regex, src, re.M)
     except Exception as ex:
         raise CommandExecutionError("{0}: '{1}'".format(_get_error_message(ex), regex))
 
@@ -3540,7 +3540,8 @@ def set_selinux_context(path,
 
     .. code-block:: bash
 
-        salt '*' file.set_selinux_context path <role> <type> <range>
+        salt '*' file.set_selinux_context path <user> <role> <type> <range>
+        salt '*' file.set_selinux_context /etc/yum.repos.d/epel.repo system_u object_r system_conf_t s0
     '''
     if not any((user, role, type, range)):
         return False
@@ -4663,7 +4664,7 @@ def manage_file(name,
 
         .. note:: keep_mode does not work with salt-ssh.
 
-            As a consequence of how the files are transfered to the minion, and
+            As a consequence of how the files are transferred to the minion, and
             the inability to connect back to the master with salt-ssh, salt is
             unable to stat the file as it exists on the fileserver and thus
             cannot mirror the mode on the salt-ssh minion
