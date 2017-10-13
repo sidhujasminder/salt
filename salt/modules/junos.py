@@ -887,7 +887,7 @@ def install_config(path=None, **kwargs):
         except Exception as exception:
             ret['message'] = 'Could not load configuration due to : "{0}"'.format(
                 exception)
-            ret['format'] = template_format
+            ret['format'] = op['format']
             ret['out'] = False
             return ret
 
@@ -1278,7 +1278,7 @@ def load(path=None, **kwargs):
     except Exception as exception:
         ret['message'] = 'Could not load configuration due to : "{0}"'.format(
             exception)
-        ret['format'] = template_format
+        ret['format'] = op['format']
         ret['out'] = False
         return ret
     finally:
