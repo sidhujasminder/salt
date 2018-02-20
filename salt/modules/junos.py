@@ -911,6 +911,8 @@ def install_config(path=None, **kwargs):
             commit_params['comment'] = op['comment']
         if 'dev_timeout' in op:
             commit_params['timeout'] = op['dev_timeout']
+        if 'timeout' in op:
+            commit_params['timeout'] = op['timeout']
 
         try:
             check = cu.commit_check()
