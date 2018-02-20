@@ -184,7 +184,11 @@ def rpc(cmd=None, dest=None, format='xml', **kwargs):
                 op[key] = value
     else:
         op.update(kwargs)
-    op['dev_timeout'] = six.text_type(op.pop('timeout', conn.timeout))
+
+    # The variable timeout is just being kept to preserve
+    # backward compatibility.
+    if 'dev_timeout' not in op:
+        op['dev_timeout'] = op.pop('timeout', conn.timeout)
 
     if cmd in ['get-config', 'get_config']:
         filter_reply = None
@@ -905,6 +909,8 @@ def install_config(path=None, **kwargs):
             commit_params['confirm'] = op['confirm']
         if 'comment' in op:
             commit_params['comment'] = op['comment']
+        if 'dev_timeout' in op:
+            commit_params['timeout'] = op['dev_timeout']
 
         try:
             check = cu.commit_check()
